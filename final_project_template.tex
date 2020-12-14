@@ -1,0 +1,272 @@
+\documentclass[11.5pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{blindtext}
+\usepackage[toc,page]{appendix}
+\usepackage{graphicx}
+\graphicspath{ {./image/} }
+
+
+
+\title{Mechanisms of Action (MoA) Prediction}
+
+
+\author{Yian Ding, Haoyu Wang}
+
+
+\date{12/13/2020}
+
+
+
+\begin{document}
+
+\maketitle
+
+
+\vspace{2mm}
+\section{Summary}
+In the field of pharmacology, drug discovery is the process of finding new candidate medications. In the past, drugs were usually inspired by function of natural products or experience of traditional remedies. The finding that the activations of biological activities of a drug requires specific interactions between the drug molecule and some macromolecules mark the modern era of pharmacology. Since then, pure chemicals replaced crude extracts of medicinal plants as the standard drugs, and numerous chemical libraries were built.
+
+In classical pharmacology, also known as forward pharmacology, scientists utilize phenotypic screening of chemical libraries to identify drug molecules that have a desirable therapeutic effect and determine the biological targets (mostly macromolecules) of those drug molecules afterwards. In reverse pharmacology, a more advanced approach, researches determine biological targets in need of treatments for certain disease first, and then choose drug molecules from chemical libraries. As a result, novel disease models can be set up in the designing of newly therapeutic drugs targeting specific disease patterns or involved molecules. That’s when mechanisms of action (MoA) comes in aid. Scientists use MoA as a shorthand to describe the biological activity of a given molecule. One way to learn the MoA of a drug is to analyze and compare its phenotype response in treated human cells with MoAs of known drugs.
+
+In this project, we aim to develop such a model that classifies drugs based on their cellular responses. We are using a dataset from Kaggle called MoA Prediction \cite{moa}. The dataset contains human-cells-to-drugs responses from about 100 different cells as well as binary MoA targets of each drug. For each drug entity, we have 100 cell viability data, 771 gene expression data and three categorical variables indicating treatment methods as features. For each drug, there are 206 possible MoA targets representing by various known drugs. If a target MoA has a match with the current drug, the cell is filled by one, else zero. Since each drug can have more than one MoA, we intrinsically have 206 binary classification problems for each drug. 
+
+After creating various visualizations to get a better understanding of our data, we utilize machine learning methods to create a prediction model that can classify each drug’s MoA with high accuracy. During the model developing process (See Appendix \ref{appendix:flow} for the flowchart), we overcome few challenges using distinct methods that will be introduced in the next section. 
+
+
+
+\section{Methods}
+
+\subsection{EDA}
+
+To start the EDA part, we need to do a quick overview for this data. From data description, we know that the features start with “g.” represent the gene expression data (772 for total), and the features start with “c.” is cell viability data (100 for total). CPTIME represents the treatment duration (24,48,72(hour)), CPTYPE indicates sample treated with a compound (cp-vehicle) or with a control perturbation (ctrl-vechicle). CPDOSE represents the usage of the treatment.
+
+Three interesting findings during EDA really affect our modeling process. The first is that samples treated with control perturbation do not have MoA (See Appendix \ref{appendix:a}). We realize that all compound treated drugs have negative activation for all MoAs, meaning they do not match with any given drugs' MoAs. As a result, we remove CPTYPE feature since it reveals no thing about the drugs.
+
+The second finding is that each drug has only a few matching MoAs in the pool of 206 MoAs. 
+
+\begin{figure}[htb]
+  \centering
+    \includegraphics{EDA1}
+  \caption{Number of matching MoAs per drug}
+  \label{fig:eda1}
+\end{figure}
+
+As shown in Figure \ref{fig:eda1} , most drugs have 0 or 1 matching MoA, and less than one percent of drugs have up to seven activations. As we have 206 target classes, we are facing a very imbalanced dataset. We need to build a model that can handle severely imbalanced data.
+
+Last but not the least, we found that some cell viability features are correlated with each other. As shown in Figure \ref{fig:eda2}, we have 35 features that have correlation with at least one other, all with correlation coefficients higher than 0.84. 
+
+
+\begin{figure}[htb]
+  \centering
+    \includegraphics[scale=0.2]{EDA2}
+  \caption{Cell Viability Correlation Matrix}
+  \label{fig:eda2}
+\end{figure}
+
+
+
+\subsection{PCA}
+
+Given that we have a total number of 874 features (after removing CPTYPE), and some of which are highly correlated, we need to find a way to reduce the number of features and minimize the effects of collinearity without losing too much information. Principal Component Analysis (PCA) is the tool we need. PCA is a classic dimension reduction method that produces orthogonal dimensions, computes principal components that can be used to perform a change of basis on the data. The components are represented by linear combinations of original variables. 
+
+Generally speaking, the more principal components we use, the more variance of the original variables are explained. The common way to select the number of principal components to include is to look at how much variance it explains. Figure \ref{fig:pca1} and \ref{fig:pca2} show the cumulative explained variance by number of principal components. In this time-variance trade-of, we select 0.8 as the threshold and include 
+26 components for cell viability and 240 components for gene expression.
+ 
+\begin{figure}[htb]
+\begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.9]{PCA1}
+  \caption{Gene expression}
+  \label{fig:pca1}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.9]{PCA2}
+   \caption{Cell Viability}
+  \label{fig:pca2}
+  \end{subfigure}
+\caption{Cumulative Explained Variance of Principal Components}
+\end{figure}
+
+
+\subsection{Classifers}
+
+Traditional classification methods like Logistic Regression do not support multi-label classification, but K-nearest neighbors algorithm (KNN) supports it by nature. Thus, we first fit a KNN model after splitting our dataset into training and testing sets. As shown in Figure \ref{fig:knn} , which shows two examples of the confusion matrices of the KNN classifier, we see that both precision and recall are great, but specificity is low. We then try logistic regression with OneVsRest Classifier Wrapper from sklearn, and essentially fit 206 binary logistic regression models for the 206 target variables we have. The resulted confusion matrices are shown in Figure \ref{fig:lr}. We have slightly better score for specificity, but the results are still not ideal. 
+
+
+\begin{figure}[htb]
+\begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.6]{KNN}
+  \caption{K-nearest neighbors confusion matrix}
+  \label{fig:knn}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.525]{LR}
+   \caption{Logistic Regression confusion matrix}
+  \label{fig:lr}
+  \end{subfigure}
+\caption{Confusion Matrices before MLSMOTE}
+\end{figure}
+
+After examining the confusion matrices, we realize that the bad specificity score results from class imbalance. To handle it, we make use of a method called MLSMOTE, which will be introduced in the next section. After creating MLSMOTE-treated dataset, we use it to re-train logistic regression classifiers. We use the same multi-label wrapper as before, and test the classifier on the same data. The new confusion matrices in Figure \ref{fig:cf} show a better performance on specificity, 0.833 and 1 comparing to 0.583 and 0.754. 
+
+\begin{figure}[htb]
+\begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.7]{CF1}
+  \label{fig:cf1}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.62]{CF2}
+  \label{fig:cf2}
+  \end{subfigure}
+\caption{Confusion Matrices after MLSMOTE}\label{fig:cf}
+\end{figure}
+
+
+
+
+\subsection{MLSMOTE}
+
+Since only a few out of 206 MoAs have positive reactions, our classifiers are prone to predict 0s, which prevents us from getting possible matching MoAs. Comparing to unrelated MoAs, we care much more about possible matching MoAs. Typical methods to deal with class imbalance include Upsampling, which duplicates minority class samples and Downsampling, which selects a random sample of majority class samples. Trying Upsampling in our example results in severe overfitting in our model, and downsampling does not improve specificity. A more advanced method, synthetic minority oversampling technique (SMOTE) \cite{smote}, combines upsampling of minority class and downsampling of majority class, while upsampling involves creating synthetic minority class examples. However, the original SMOTE algorithm only supports binary classification. To apply this technique to our project, we make use of a recent variation of SMOTE, multi-label SMOTE (MLSMOTE) that was published at 2015 \cite{mlsmotepaper}. Figure \ref{fig:mlsmote} presents the pseudo-code of this algorithm that was provided by the original paper. MLSMOTE , as its name states, supports multilabel datasets. There are no package that implemented MLSMOTE, but there are related code snippets on Github \cite{mlsmoteweb}. After debugging and localizing the algorithm, we generate about eight thousand synthetic samples. As a reference, we include a few rows of our original data as well as generated data. \ref{fig:d}
+
+
+\begin{figure}[htb]
+  \centering
+    \includegraphics[scale=0.4]{MLSMOTE}
+  \caption{MLSMOTE pseudo-code from original paper}
+  \label{fig:mlsmote}
+\end{figure}
+
+
+
+\begin{figure}[htb]
+\begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.7]{DATA1}
+  \caption{Original features}
+  \label{fig:d1}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.75]{DATA2}
+   \caption{MLSMOTE features}
+  \label{fig:d2}
+  \end{subfigure}
+  
+ \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.6]{DATA4}
+  \caption{Original targets}
+  \label{fig:d3}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.5\textwidth}
+  \includegraphics[scale=0.57]{DATA3}
+   \caption{MLSMOTE targets}
+  \label{fig:d4}
+  \end{subfigure}
+\caption{Original Dataset and MLSMOTE Dataset}\label{fig:d}
+\end{figure}
+
+
+
+\section{Results}
+
+To better recognize the overall improvement of the model, we calculate the micro-average of all metrics before and after MLSMOTE treatment \ref{fig:ave}. Before, the overall precision, recall and specificity are 0.968, 0.971 and 0.801, respectively. After the re-run, precision and recall improved a little bit, and specificity jump to .909.
+
+\begin{figure}[htb]
+  \centering
+    \includegraphics[scale=0.4]{Overall}
+  \caption{Micro-average of metrics before and after MLSMOTE}\label{fig:ave}
+\end{figure}
+
+The significant improvement of specificity indicates that using MLSMOTE ameliorates the unsatisfactory results commonly produced by imbalanced data. By applying several techniques during this project, we successfully created a prediction model with high specificity and sensitivity. Overall, the model handles multi-label classification and class imbalance problems with simple yet efficient methods, and has the potential to applicate in real world for its simplicity and speed.
+
+
+\section{Discussion}
+
+In Pharmaceutical Analysis, every drug discovery has its own process. There are many things to involve in this process and a specific drug is just one element in this process. In pharmacology, we call it molecular targeted therapeutic drugs. Nowadays, scientists use MoA to test whether a new compound can be used to treat or have effects on a specific molecule target. Therefore, by creating a model with high specificity and is sensitive to class imbalance, we may help pharmaceutical companies to reduce the development costs and time consumption. Consequently, patients may get access to more drugs with lower prices. Furthermore, by comparing MoAs with previous drugs, we can predict and quantify the performance of new drugs, thus saving a lot of time and money from running tests. 
+
+Class imbalance has long been a problem in machine learning, given that many algorithms are designed for balanced data to minimize classification error. In the extreme cases such as having less than one percent of minority cases, the classifier tends to be lazy and predicts all majority cases to minimize error rate. However, when the cost of different types of error are not the same, which in our case means that false negative rates have higher weights than false positive rates, we need to prevent our model from being lazy. For future work, we can try other approaches to deal with class imbalance, such as cost-sensitive learning, a type of learning that takes the misclassification costs (and possibly other types of cost) into consideration \cite{cost}. We can also try another dimension reduction method, t-SNE, which is insensitive to outliers and models non-linear relationships. Lastly, deep learning neural networks are an example of an algorithm that natively supports multi-label classification problems. Although it is sensitive to class imbalance, we may achieve better than current results with careful class balancing and hyper-parameter tuning.
+  
+
+
+
+\section{Statement of contributions}
+Haoyu Wang carried out EDA and contributed to writing Summary and Discussion sections of the report.
+
+Yian Ding carried out data preprocessing, PCA, modeling and implemented MLSMOTE. She constructed the report using Latex, wrote Methods and Results sections and contributed to writing Summary and Discussion sections of the report. 
+
+
+
+\begin{thebibliography}{9}
+
+
+\bibitem{moa} 
+Mechanisms of Action (MoA) Prediction,
+\\\texttt{https://www.kaggle.com/c/lish-moa}
+
+\bibitem{smote} 
+Chawla, N. V. and Bowyer, K. W. and Hall, L. O. and Kegelmeyer, W. P.
+\textit{SMOTE: Synthetic Minority Over-sampling Technique}. 
+AI Access Foundation, Volume 16, 2015, Pages 321–357, ISSN 1076-9757, https://arxiv.org/pdf/1106.1813.pdf
+
+\bibitem{mlsmotepaper} 
+Francisco Charte, Antonio J. Rivera, María J. del Jesus, Francisco Herrera.
+\textit{MLSMOTE: Approaching imbalanced multilabel learning through synthetic instance generation}. 
+Knowledge-Based Systems, Volume 89, 2015, Pages 385-397, ISSN 0950-7051, https://doi.org/10.1016/j.knosys.2015.07.019.
+
+
+\bibitem{mlsmoteweb} 
+Nitesh Sukhwani: MLSMOTE,
+\\\texttt{https://github.com/niteshsukhwani/MLSMOTE/blob/master/mlsmote.py}
+
+\bibitem{cost} 
+Charles X. LingVictor S. Sheng
+\textit{Cost-Sensitive Learning}. 
+Encyclopedia of Machine Learning, 2011, Pages 216-220
+\end{thebibliography}
+
+
+
+\begin{appendices}
+
+\section{More EDA}
+
+\label{appendix:a}
+
+\begin{figure}[htb]
+\begin{subfigure}[b]{0.33\textwidth}
+  \includegraphics[scale=0.75]{COMPOUND3}
+  \label{fig:c3}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.33\textwidth}
+  \includegraphics[scale=0.53]{COMPOUND2}
+  \label{fig:c2}
+  \end{subfigure}  
+ \begin{subfigure}[b]{0.33\textwidth}
+  \includegraphics[scale=0.7]{COMPOUND}
+  \label{fig:c}
+  \end{subfigure}
+\caption{Control perturbation EDA}\label{fig:cpdd}
+\end{figure}
+
+
+\section{Relevant Code}
+
+
+
+
+\section{Methods Flow Chart}
+
+\label{appendix:flow}
+
+\begin{figure}[htb]
+  \centering
+    \includegraphics[scale=0.4]{FLOWCHART}
+  \caption{Flow chart of modeling methods}
+\end{figure}
+
+\end{appendices}
+
+
+
+
+\end{document}

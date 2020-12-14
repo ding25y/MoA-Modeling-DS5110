@@ -1,0 +1,14 @@
+---
+title: "Project5110"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+train <- read_csv("lish-moa/train_features.csv")
+y <- read_csv('lish-moa/train_targets_scored.csv')
+```
+
